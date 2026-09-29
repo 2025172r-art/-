@@ -139,6 +139,8 @@
     <label>ADMIN_PIN</label>
     <input id="pin" type="password" autocomplete="off">
     <button type="button" class="menu-btn" id="btn-login">入る</button>
+    <button type="button" class="menu-btn btn-warning" id="btn-conn-test">接続テスト</button>
+    <pre id="conn-out" class="text-sub" style="white-space:pre-wrap;min-height:2.5em;"></pre>
     <p id="err" class="text-sub" style="color:#fca5a5;"></p>
   </div>
         <div id="developer-view" class="page-view dev-panel ym-cc hidden" style="min-height:100dvh">
@@ -172,6 +174,7 @@
                     <h3 id="ym-cc-page-title">Overview</h3>
                     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
                         <span class="ym-cc-chip" id="ym-cc-session-chip">SESSION</span>
+                        <span class="ym-cc-chip" id="ym-cc-sync-chip">SYNC —</span>
                         <span class="text-sub" id="ym-cc-clock" style="color:#94a3b8;font-size:12px;"></span>
                     </div>
                 </div>
@@ -387,6 +390,10 @@
             <div id="dev-tab-system" class="dev-tab-content hidden">
                 <h3>System</h3>
                 <div class="ym-cc-sys" id="ym-cc-system-full"></div>
+                <div class="ym-cc-card" style="margin-top:12px;">
+                  <h4>同期</h4>
+                  <pre id="ym-cc-sync-box" class="ym-cc-log" style="min-height:80px;">まだ同期していません。本体で YM_CONVEX_URL と YM_DEV_SYNC_TOKEN を入れてください。</pre>
+                </div>
             </div>
 
             <div id="dev-tab-security" class="dev-tab-content hidden">
@@ -411,108 +418,226 @@
     </div>
 <script>
 const KEY="YM_CONVEX_URL";
-document.getElementById("url").value=localStorage.getItem(KEY)||"";
-function url(){ const u=String(document.getElementById("url").value||localStorage.getItem(KEY)||"").replace(/\/$/,""); localStorage.setItem(KEY,u); return u; }
-function creds(){ return { email:document.getElementById("email").value.trim().toLowerCase(), pin:document.getElementById("pin").value }; }
-async function run(kind,path,args){
-  const res=await fetch(url()+"/api/"+kind,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({path:path,args:args,format:"json"})});
-  const data=await res.json();
-  if(data.status==="error"||data.errorMessage) throw new Error(data.errorMessage||data.error||"失敗");
-  return data.value!==undefined?data.value:data;
+let lastSnap = { users: [], at: 0, messageCount: 0, stampCount: 0, announcement: "", logs: [] };
+document.getElementById("url").value = localStorage.getItem(KEY) || "";
+
+function url(){
+  const u = String(document.getElementById("url").value || localStorage.getItem(KEY) || "").replace(/\/$/, "");
+  localStorage.setItem(KEY, u);
+  return u;
+}
+function creds(){
+  return { email: document.getElementById("email").value.trim().toLowerCase(), pin: document.getElementById("pin").value };
+}
+async function run(kind, path, args){
+  const res = await fetch(url() + "/api/" + kind, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path: path, args: args, format: "json" })
+  });
+  const data = await res.json();
+  if (data.status === "error" || data.errorMessage) throw new Error(data.errorMessage || data.error || "失敗");
+  return data.value !== undefined ? data.value : data;
 }
 function showPanel(on){
-  document.getElementById("admin-gate").classList.toggle("hidden",on);
-  document.getElementById("developer-view").classList.toggle("hidden",!on);
-  document.body.classList.toggle("ym-cc-active",on);
+  document.getElementById("admin-gate").classList.toggle("hidden", on);
+  document.getElementById("developer-view").classList.toggle("hidden", !on);
+  document.body.classList.toggle("ym-cc-active", on);
 }
+function esc(t){ return String(t==null?"":t).replace(/[&<>"]/g, function(c){ return ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"})[c]; }); }
+function ago(ts){
+  if (!ts) return "未同期";
+  const s = Math.max(0, Math.round((Date.now()-Number(ts))/1000));
+  if (s < 10) return "たった今";
+  if (s < 60) return s + "秒前";
+  if (s < 3600) return Math.floor(s/60) + "分前";
+  return new Date(Number(ts)).toLocaleString();
+}
+
 document.querySelectorAll(".dev-tab-btn").forEach(function(btn){
-  btn.addEventListener("click",function(){
-    document.querySelectorAll(".dev-tab-btn").forEach(function(b){b.classList.remove("active");});
-    document.querySelectorAll(".dev-tab-content").forEach(function(t){t.classList.add("hidden");});
+  btn.addEventListener("click", function(){
+    document.querySelectorAll(".dev-tab-btn").forEach(function(b){ b.classList.remove("active"); });
+    document.querySelectorAll(".dev-tab-content").forEach(function(t){ t.classList.add("hidden"); });
     btn.classList.add("active");
-    const id=btn.getAttribute("data-tab");
-    const el=document.getElementById(id);
-    if(el) el.classList.remove("hidden");
-    const title=document.getElementById("ym-cc-page-title");
-    if(title) title.textContent=btn.textContent.trim();
+    const el = document.getElementById(btn.getAttribute("data-tab"));
+    if (el) el.classList.remove("hidden");
+    const title = document.getElementById("ym-cc-page-title");
+    if (title) title.textContent = btn.textContent.trim();
   });
 });
-document.getElementById("btn-login").onclick=async function(){
-  const err=document.getElementById("err"); err.textContent="";
+
+function paintOverview(){
+  const k = document.getElementById("ym-cc-kpis");
+  if (!k) return;
+  const users = lastSnap.users || [];
+  const blocked = users.filter(function(u){ return u.blocked; }).length;
+  const coins = users.reduce(function(a,u){ return a + (Number(u.coins)||0); }, 0);
+  k.innerHTML =
+    '<div class="ym-cc-kpi"><div class="l">Users</div><div class="n">'+users.length+'</div><div class="s">スナップショット</div></div>' +
+    '<div class="ym-cc-kpi"><div class="l">Messages</div><div class="n">'+(lastSnap.messageCount||0)+'</div><div class="s">本体件数</div></div>' +
+    '<div class="ym-cc-kpi"><div class="l">Coins</div><div class="n">'+coins+'</div><div class="s">合計</div></div>' +
+    '<div class="ym-cc-kpi"><div class="l">Blocked</div><div class="n">'+blocked+'</div><div class="s">停止</div></div>';
+  const sys = document.getElementById("ym-cc-overview-sys");
+  if (sys) {
+    sys.innerHTML =
+      '<div class="ym-cc-sys-row"><span>最終同期</span><b>'+ago(lastSnap.at)+'</b></div>' +
+      '<div class="ym-cc-sys-row"><span>お知らせ</span><b>'+(lastSnap.announcement ? "あり" : "なし")+'</b></div>' +
+      '<div class="ym-cc-sys-row"><span>スタンプ</span><b>'+(lastSnap.stampCount||0)+'</b></div>';
+  }
+  const log = document.getElementById("ym-cc-overview-log");
+  if (log) log.textContent = (lastSnap.logs && lastSnap.logs.length) ? lastSnap.logs.join("\n") : "本体からのログはまだありません。";
+  const chip = document.getElementById("ym-cc-sync-chip");
+  if (chip) {
+    chip.textContent = lastSnap.at ? ("SYNC " + ago(lastSnap.at)) : "SYNC 未接続";
+    chip.className = "ym-cc-chip " + (lastSnap.at && Date.now()-lastSnap.at < 20000 ? "ok" : "bad");
+  }
+  const box = document.getElementById("ym-cc-sync-box");
+  if (box) box.textContent = JSON.stringify({ at: lastSnap.at, users: users.length, messages: lastSnap.messageCount, url: url() }, null, 2);
+  const sysFull = document.getElementById("ym-cc-system-full");
+  if (sysFull) {
+    sysFull.innerHTML =
+      '<div class="ym-cc-sys-row"><span>Convex</span><b>'+esc(url()||"—")+'</b></div>' +
+      '<div class="ym-cc-sys-row"><span>同期</span><b>'+ago(lastSnap.at)+'</b></div>';
+  }
+}
+
+function paintUsers(){
+  const q = ((document.getElementById("ym-cc-user-q")||{}).value||"").toLowerCase();
+  const st = ((document.getElementById("ym-cc-user-status")||{}).value||"all");
+  const userList = document.getElementById("dev-user-list");
+  if (!userList) return;
+  userList.innerHTML = "";
+  const users = lastSnap.users || [];
+  users.forEach(function(u){
+    const hay = String(u.name||"") + " " + String(u.id||"");
+    if (q && hay.toLowerCase().indexOf(q) < 0) return;
+    if (st === "blocked" && !u.blocked) return;
+    if (st === "online" || st === "offline") return; /* スナップショットにオンラインは無いので無視しない: 全員表示 */
+    const tr = document.createElement("tr");
+    tr.innerHTML =
+      "<td><strong>"+esc(u.name)+"</strong><br><span style='font-size:10px;color:#888;'>"+esc(u.id)+"</span></td>" +
+      "<td>"+esc(u.usage||"—")+"</td>" +
+      "<td>🪙 "+esc(u.coins||0)+"</td>" +
+      "<td>"+(u.blocked?"停止中":"正常")+"</td>" +
+      "<td><button type='button' class='menu-btn' style='padding:2px 8px;margin:0;font-size:11px;' data-copy='"+esc(u.id)+"'>IDコピー</button></td>";
+    userList.appendChild(tr);
+  });
+  if (!users.length) {
+    userList.innerHTML = "<tr><td colspan='5'>まだ同期されていません。本体で YM_CONVEX_URL と YM_DEV_SYNC_TOKEN を入れてチャットを開いたままにしてください。</td></tr>";
+  }
+  const dist = document.getElementById("distribute-target");
+  if (dist) {
+    const cur = dist.value;
+    dist.innerHTML = '<option value="ALL">【全員一斉】全登録ユーザー</option>';
+    users.forEach(function(u){
+      const o = document.createElement("option");
+      o.value = u.id; o.textContent = (u.name||u.id) + " (" + u.id + ")";
+      dist.appendChild(o);
+    });
+    if (cur) dist.value = cur;
+  }
+}
+
+document.getElementById("dev-user-list").addEventListener("click", function(e){
+  const id = e.target && e.target.getAttribute && e.target.getAttribute("data-copy");
+  if (!id) return;
+  navigator.clipboard.writeText(id).then(function(){ e.target.textContent = "コピー済"; }, function(){});
+});
+["ym-cc-user-q","ym-cc-user-status"].forEach(function(id){
+  const el = document.getElementById(id);
+  if (el) el.addEventListener("input", paintUsers);
+  if (el) el.addEventListener("change", paintUsers);
+});
+
+async function fillFromSnapshot(){
+  const res = await run("query", "admin:getSnapshot", creds());
+  lastSnap = JSON.parse((res && res.payload) || "{}") || {};
+  lastSnap.users = lastSnap.users || [];
+  paintOverview();
+  paintUsers();
+  const msg = document.getElementById("ym-cc-msg-list");
+  if (msg) msg.textContent = "同期メッセージ数: " + (lastSnap.messageCount||0) + "\n本文一覧の同期は次の段階です。";
+}
+
+async function loadCoins(){
   try{
-    const me=await run("query","admin:whoami",creds());
-    const chip=document.getElementById("ym-cc-session-chip");
-    if(chip) chip.textContent=me.email;
+    const rows = await run("query","admin:listCoinLedger", creds());
+    const box = document.getElementById("ym-cc-tx-list");
+    if (!box) return;
+    box.textContent = (rows||[]).map(function(r){
+      const n = Number(r.amount)||0;
+      return (n>0?"+":"") + n + " → " + (r.target||"") + " / " + (r.actorEmail||"");
+    }).join("\n") || "台帳は空です";
+  }catch(e){}
+}
+
+document.getElementById("btn-login").onclick = async function(){
+  const err = document.getElementById("err"); err.textContent = "";
+  try{
+    const me = await run("query","admin:whoami", creds());
+    const chip = document.getElementById("ym-cc-session-chip");
+    if (chip) chip.textContent = me.email;
     showPanel(true);
-  }catch(e){ err.textContent=e.message||"入れません"; }
+    await fillFromSnapshot();
+    await loadCoins();
+  }catch(e){ err.textContent = e.message || "入れません"; }
 };
-const exitBtn=document.getElementById("btn-exit-dev");
-if(exitBtn) exitBtn.onclick=function(){ showPanel(false); };
-const saveAnn=document.getElementById("btn-save-announcement");
-if(saveAnn) saveAnn.onclick=async function(){
+document.getElementById("btn-conn-test").onclick = async function(){
+  const out = document.getElementById("conn-out");
+  out.textContent = "確認中...";
   try{
-    const body=document.getElementById("dev-announcement-text").value;
-    const style=(document.getElementById("dev-announcement-style")||{}).value||"normal";
-    await run("mutation","admin:postAnnouncement",Object.assign(creds(),{body:body,style:style}));
-    alert("本体が数秒以内に読みます。Convex URL を本体でも同じ値にしてください。");
+    const me = await run("query","admin:whoami", creds());
+    let t = "whoami OK / " + me.email;
+    try{
+      const snap = await run("query","admin:getSnapshot", creds());
+      const obj = JSON.parse((snap && snap.payload) || "{}");
+      t += "\nユーザー " + ((obj.users&&obj.users.length)||0) + "人 / " + ago(obj.at);
+      if (!obj.at) t += "\n本体がまだ上げていません。チャットでトークンを入れて開きっぱなしにしてください。";
+    }catch(e){ t += "\ngetSnapshot: " + e.message; }
+    out.textContent = t;
+  }catch(e){ out.textContent = "失敗: " + (e.message||e); }
+};
+document.getElementById("btn-exit-dev").onclick = function(){ showPanel(false); };
+
+document.getElementById("btn-save-announcement").onclick = async function(){
+  try{
+    await run("mutation","admin:postAnnouncement", Object.assign(creds(), {
+      body: document.getElementById("dev-announcement-text").value,
+      style: document.getElementById("dev-announcement-style").value || "normal"
+    }));
+    alert("配信しました。本体は約8秒で読みます。");
   }catch(e){ alert(e.message||"保存できません"); }
 };
-const dist=document.getElementById("btn-exec-distribute");
-if(dist) dist.onclick=async function(){
+const ta = document.getElementById("dev-announcement-text");
+const cc = document.getElementById("announcement-char-count");
+if (ta && cc) ta.addEventListener("input", function(){ cc.textContent = ta.value.length + " / 1000 文字"; });
+
+document.getElementById("btn-exec-distribute").onclick = async function(){
   try{
-    const typ=document.getElementById("distribute-type").value;
-    if(typ!=="coin"){ alert("スタンプ配布は次の段階です。今はコインのみサーバーへ送ります。"); return; }
-    const target=document.getElementById("distribute-target").value||document.getElementById("distribute-target").options[0]&&document.getElementById("distribute-target").options[0].value||"";
-    const rawTarget=target || prompt("対象ユーザーID") || "";
-    await run("mutation","admin:adjustCoins",Object.assign(creds(),{
-      creatorUnlock:(document.getElementById("creator-unlock")||{}).value||"",
-      target:rawTarget,
-      amount:Number(document.getElementById("dist-coin-amount").value),
-      note:"distribute"
+    if (document.getElementById("distribute-type").value !== "coin") {
+      alert("今はコインのみサーバーへ送ります。"); return;
+    }
+    const rawTarget = document.getElementById("distribute-target").value || prompt("対象ユーザーID") || "";
+    await run("mutation","admin:adjustCoins", Object.assign(creds(), {
+      creatorUnlock: document.getElementById("creator-unlock").value || "",
+      target: rawTarget,
+      amount: Number(document.getElementById("dist-coin-amount").value),
+      note: "distribute"
     }));
-    alert("コイン台帳に記録しました");
+    alert("台帳に記録しました。本体が残高を取り込みます。");
+    loadCoins();
   }catch(e){ alert(e.message||"記録できません"); }
 };
 
-async function fillFromSnapshot(){
-  try{
-    const res = await run("query","admin:getSnapshot",creds());
-    const snap = JSON.parse(res.payload||"{}");
-    const users = snap.users || [];
-    const userList = document.getElementById("dev-user-list");
-    if(userList){
-      userList.innerHTML = "";
-      users.forEach(function(u){
-        const tr=document.createElement("tr");
-        tr.innerHTML = "<td><strong>"+String(u.name||"").replace(/[<>]/g,"")+"</strong><br><span style='font-size:10px;color:#888;'>"+String(u.id||"")+"</span></td><td>"+String(u.usage||"—")+"</td><td>🪙 "+String(u.coins||0)+"</td><td>"+(u.blocked?"停止中":"正常")+"</td><td></td>";
-        userList.appendChild(tr);
-      });
-    }
-    const dist=document.getElementById("distribute-target");
-    if(dist){
-      dist.innerHTML = '<option value="ALL">【全員一斉】全登録ユーザー</option>';
-      users.forEach(function(u){
-        const o=document.createElement("option");
-        o.value=u.id; o.textContent=(u.name||u.id)+" ("+u.id+")";
-        dist.appendChild(o);
-      });
-    }
-    const logs=document.getElementById("ym-cc-log-full")||document.getElementById("dev-logs");
-    if(logs && snap.logs){ logs.textContent = (snap.logs||[]).join("\n"); }
-    const msgBox=document.getElementById("dev-tab-messages");
-    if(msgBox && snap.messageCount!=null){
-      let n=document.getElementById("ym-sync-msg-count");
-      if(!n){ n=document.createElement("p"); n.id="ym-sync-msg-count"; n.className="text-sub"; msgBox.insertBefore(n, msgBox.firstChild); }
-      n.textContent="同期メッセージ数: "+snap.messageCount;
-    }
-  }catch(e){}
-}
-setInterval(function(){ if(!document.getElementById("developer-view").classList.contains("hidden")) fillFromSnapshot(); }, 5000);
-const _login = document.getElementById("btn-login").onclick;
-document.getElementById("btn-login").onclick = async function(){
-  await _login();
-  fillFromSnapshot();
-};
+setInterval(function(){
+  const c = document.getElementById("ym-cc-clock");
+  if (c) c.textContent = new Date().toLocaleTimeString();
+}, 1000);
+setInterval(function(){
+  if (document.getElementById("developer-view").classList.contains("hidden")) return;
+  fillFromSnapshot().catch(function(){});
+  loadCoins();
+}, 5000);
 </script>
 </body>
 </html>
