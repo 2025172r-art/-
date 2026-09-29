@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Y.M Control Center</title>
+  <style>
+    :root {
+      --primary: #06C755;
+      --primary-hover: #05b34c;
+      --bg-main: #070b14;
+      --bg-card: #0b1220;
+      --text-main: #e2e8f0;
+      --text-muted: #94a3b8;
+      --border-color: #1e293b;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --success: #10b981;
+      --radius-md: 10px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: sans-serif; }
+    body { background:#070b14; color:#e2e8f0; min-height:100dvh; }
+    .menu-btn { width: 100%; padding: 10px 14px; margin-bottom: 8px; background: var(--primary); color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: 600; font-size: 14px; }
+    .btn-danger { background: var(--danger) !important; }
+    .btn-warning { background: var(--warning) !important; color:#fff !important; }
+    .btn-success { background: var(--success) !important; }
+    .hidden { display:none !important; }
+    .text-sub { font-size:12px; color:#94a3b8; }
+    #admin-gate { max-width:420px; margin:8vh auto; padding:18px; background:#0b1220; border:1px solid #1e293b; border-radius:12px; }
+    #admin-gate input { width:100%; margin:6px 0 12px; padding:10px; background:#111827; color:#fff; border:1px solid #334155; border-radius:8px; }
+            /* ===== Y.M Control Center (developer-view only; additive) ===== */
+        body.ym-cc-active { background:#070b14; }
+        body.ym-cc-active #app-sidebar,
+        body.ym-cc-active .ym-bottom-nav,
+        body.ym-cc-active .skip-link { display:none !important; }
+        body.ym-cc-active .main-content { padding:0; gap:0; background:#070b14; overflow:hidden; }
+        body.ym-cc-active #developer-view.ym-cc {
+            display:flex !important; flex-direction:row; border-radius:0; padding:0; margin:0;
+            background:#070b14; color:#e5eefc; border:none; box-shadow:none; min-height:100%; height:100%;
+            overflow:hidden; font-family: ui-sans-serif, 'Segoe UI', 'Hiragino Sans', sans-serif;
+        }
+        .ym-cc-nav {
+            width:228px; flex:0 0 228px; background:#0b1220; border-right:1px solid #1e293b;
+            display:flex; flex-direction:column; min-height:0; overflow:auto;
+        }
+        .ym-cc-brand { padding:16px 14px 10px; border-bottom:1px solid #1e293b; }
+        .ym-cc-brand .k { font-size:10px; letter-spacing:.16em; color:#64748b; font-weight:800; }
+        .ym-cc-brand h2 { font-size:16px; margin:4px 0 0; color:#f8fafc; font-weight:800; }
+        .ym-cc-search { padding:10px 12px; }
+        .ym-cc-search input {
+            width:100%; margin:0; background:#111827; color:#e2e8f0; border:1px solid #334155;
+            border-radius:8px; padding:8px 10px; font-size:12px;
+        }
+        .ym-cc-nav-btn {
+            width:calc(100% - 16px); margin:2px 8px; padding:8px 10px; border:none; border-radius:8px;
+            background:transparent; color:#94a3b8; text-align:left; cursor:pointer; font-weight:700; font-size:12px;
+        }
+        .ym-cc-nav-btn:hover { background:#122033; color:#e2e8f0; }
+        .ym-cc-nav-btn.active { background:#16324a; color:#7dd3fc; box-shadow:inset 3px 0 0 #38bdf8; }
+        .ym-cc-nav-foot { margin-top:auto; padding:10px; border-top:1px solid #1e293b; }
+        .ym-cc-main { flex:1; min-width:0; min-height:0; display:flex; flex-direction:column; overflow:hidden; }
+        .ym-cc-top {
+            flex-shrink:0; display:flex; align-items:center; justify-content:space-between; gap:10px;
+            padding:10px 16px; background:#0b1220; border-bottom:1px solid #1e293b;
+        }
+        .ym-cc-top h3 { margin:0; font-size:15px; color:#f8fafc; }
+        .ym-cc-kpis { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin:0 0 14px; }
+        .ym-cc-kpi {
+            background:linear-gradient(180deg,#111827,#0b1220); border:1px solid #1e293b; border-radius:12px; padding:12px;
+        }
+        .ym-cc-kpi .l { font-size:10px; color:#94a3b8; font-weight:800; letter-spacing:.06em; text-transform:uppercase; }
+        .ym-cc-kpi .n { font-size:22px; font-weight:900; margin-top:4px; color:#f8fafc; }
+        .ym-cc-kpi .s { font-size:11px; color:#64748b; margin-top:2px; }
+        .ym-cc-grid2 { display:grid; grid-template-columns:1.4fr .8fr; gap:12px; }
+        .ym-cc-card { background:#0b1220; border:1px solid #1e293b; border-radius:12px; padding:12px; }
+        .ym-cc-card h4 { margin:0 0 8px; font-size:13px; color:#e2e8f0; }
+        .ym-cc-sys { display:flex; flex-direction:column; gap:6px; }
+        .ym-cc-sys-row { display:flex; justify-content:space-between; align-items:center; font-size:12px; padding:6px 0; border-bottom:1px solid #1e293b; }
+        .ym-cc-dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; }
+        .ym-cc-dot.ok { background:#22c55e; box-shadow:0 0 8px #22c55e; }
+        .ym-cc-dot.warn { background:#eab308; }
+        .ym-cc-dot.bad { background:#ef4444; }
+        .ym-cc-log {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            font-size:12px; background:#05080f; color:#86efac; border:1px solid #1e293b; border-radius:10px;
+            padding:10px; min-height:240px; max-height:58vh; overflow:auto; white-space:pre-wrap; line-height:1.55;
+        }
+        .ym-cc-log .err { color:#fca5a5; }
+        .ym-cc-toolbar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:10px; }
+        .ym-cc-toolbar input, .ym-cc-toolbar select {
+            width:auto; margin:0; background:#111827; color:#e2e8f0; border:1px solid #334155; padding:6px 8px; font-size:12px;
+        }
+        #developer-view.ym-cc .dev-tab-content { flex:1; min-height:0; overflow:auto; padding:14px 16px 24px; }
+        #developer-view.ym-cc .dev-panel table, #developer-view.ym-cc table {
+            width:100%; border-collapse:separate; border-spacing:0; border:1px solid #1e293b; border-radius:10px; overflow:hidden; background:#0b1220;
+        }
+        #developer-view.ym-cc th { background:#111827; color:#94a3b8; }
+        #developer-view.ym-cc td, #developer-view.ym-cc th { border-bottom:1px solid #1e293b; color:#e2e8f0; font-size:12px; padding:8px 10px; }
+        #developer-view.ym-cc label { color:#94a3b8; }
+        #developer-view.ym-cc input, #developer-view.ym-cc textarea, #developer-view.ym-cc select {
+            background:#111827; color:#e2e8f0; border-color:#334155;
+        }
+        #developer-view.ym-cc h3 { color:#f8fafc; }
+        .ym-cc-drawer {
+            width:0; flex:0 0 0; overflow:hidden; background:#0b1220; border-left:1px solid #1e293b; transition:flex-basis .2s ease, width .2s ease;
+        }
+        .ym-cc-drawer.open { width:320px; flex-basis:320px; padding:14px; overflow:auto; }
+        .ym-cc-bar { height:8px; background:#1e293b; border-radius:99px; overflow:hidden; }
+        .ym-cc-bar > i { display:block; height:100%; background:#38bdf8; }
+        .ym-cc-chip { display:inline-block; border-radius:999px; padding:2px 8px; font-size:10px; font-weight:800; background:#1e293b; color:#cbd5e1; }
+        .ym-cc-chip.ok { background:#052e16; color:#86efac; }
+        .ym-cc-chip.bad { background:#450a0a; color:#fca5a5; }
+        .ym-cc-bars { display:flex; flex-direction:column; gap:8px; margin-top:10px; }
+        .ym-cc-bar-row { display:grid; grid-template-columns:92px 1fr 48px; gap:8px; align-items:center; font-size:11px; color:#cbd5e1; }
+        .ym-cc-bar-row b { font-weight:700; color:#94a3b8; }
+        .ym-cc-bar-row em { font-style:normal; text-align:right; font-weight:800; color:#e2e8f0; }
+        .ym-cc-hotkeys { font-size:10px; color:#64748b; padding:8px 12px 12px; line-height:1.5; }
+        .ym-cc-req-col { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
+        .ym-cc-req-col h5 { margin:0 0 6px; font-size:11px; color:#94a3b8; }
+        .ym-cc-req-item { background:#111827; border:1px solid #334155; border-radius:8px; padding:8px; font-size:12px; margin-bottom:6px; }
+        @media (max-width: 900px) {
+            body.ym-cc-active #developer-view.ym-cc { flex-direction:column; }
+            .ym-cc-nav { width:100%; flex:none; max-height:38vh; flex-direction:row; flex-wrap:wrap; }
+            .ym-cc-kpis, .ym-cc-grid2, .ym-cc-req-col { grid-template-columns:1fr 1fr; }
+            .ym-cc-drawer.open { width:100%; flex-basis:auto; max-height:40vh; }
+        }
+    body.ym-cc-active #developer-view.ym-cc { display:flex !important; }
+  </style>
+</head>
+<body>
+  <div id="admin-gate">
+    <div style="font-size:10px;letter-spacing:.16em;color:#64748b;font-weight:800;">Y.M CONTROL CENTER</div>
+    <h2 style="margin:6px 0 10px;">開発者パネル（Convex）</h2>
+    <p class="text-sub" style="margin-bottom:10px;">見た目は本体と同じです。お知らせは Convex 経由で本体が読みます。</p>
+    <label>Convex URL</label>
+    <input id="url" placeholder="https://xxxx.convex.cloud">
+    <label>管理者メール</label>
+    <input id="email" type="email">
+    <label>ADMIN_PIN</label>
+    <input id="pin" type="password" autocomplete="off">
+    <button type="button" class="menu-btn" id="btn-login">入る</button>
+    <p id="err" class="text-sub" style="color:#fca5a5;"></p>
+  </div>
+        <div id="developer-view" class="page-view dev-panel ym-cc hidden" style="min-height:100dvh">
+            <aside class="ym-cc-nav" id="ym-cc-nav">
+                <div class="ym-cc-brand">
+                    <div class="k">Y.M CONTROL CENTER</div>
+                    <h2>開発者OS</h2>
+                </div>
+                <div class="ym-cc-search">
+                    <input type="search" id="ym-cc-global-search" placeholder="検索 / ユーザー / YM-ID  ( / )" autocomplete="off">
+                </div>
+                <button class="dev-tab-btn ym-cc-nav-btn active" data-tab="dev-tab-overview">Overview</button>
+                <button class="dev-tab-btn ym-cc-nav-btn" data-tab="dev-tab-users">Users</button>
+                <button class="dev-tab-btn ym-cc-nav-btn" data-tab="dev-tab-messages">Messages</button>
+                <button class="dev-tab-btn ym-cc-nav-btn" data-tab="dev-tab-ai">AI</button>
+                <button class="dev-tab-btn ym-cc-nav-btn" data-tab="dev-tab-calls">Calls</button>
+                <button class="dev-tab-btn ym-cc-nav-btn" data-tab="dev-tab-distribute">Coins</button>
+                <button class="dev-tab-btn ym-cc-nav-btn" data-tab="dev-tab-plans">Plans</button>
+                <button class="dev-tab-btn ym-cc-nav-btn" data-tab="dev-tab-stamps">Stamps</button>
+                <button class="dev-tab-btn ym-cc-nav-btn" data-tab="dev-tab-requests">Requests</button>
+                <button class="dev-tab-btn ym-cc-nav-btn" data-tab="dev-tab-upgrade">Announcements</button>
+                <button class="dev-tab-btn ym-cc-nav-btn" data-tab="dev-tab-system">System</button>
+                <button class="dev-tab-btn ym-cc-nav-btn" data-tab="dev-tab-security">Security</button>
+                <button class="dev-tab-btn ym-cc-nav-btn" data-tab="dev-tab-logs">Logs</button>
+                <div class="ym-cc-nav-foot">
+                    <button class="menu-btn btn-danger" id="btn-exit-dev" style="margin:0;">ユーザー画面に戻る</button>
+                </div>
+            </aside>
+            <div class="ym-cc-main">
+                <div class="ym-cc-top">
+                    <h3 id="ym-cc-page-title">Overview</h3>
+                    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                        <span class="ym-cc-chip" id="ym-cc-session-chip">SESSION</span>
+                        <span class="text-sub" id="ym-cc-clock" style="color:#94a3b8;font-size:12px;"></span>
+                    </div>
+                </div>
+
+            <div id="dev-tab-overview" class="dev-tab-content">
+                <div class="ym-cc-kpis" id="ym-cc-kpis"></div>
+                <div class="ym-cc-grid2">
+                    <div class="ym-cc-card">
+                        <h4>直近ログ</h4>
+                        <div class="ym-cc-log" id="ym-cc-overview-log"></div>
+                    </div>
+                    <div class="ym-cc-card">
+                        <h4>システム状態</h4>
+                        <div class="ym-cc-sys" id="ym-cc-overview-sys"></div>
+                        <div style="margin-top:10px;font-size:12px;color:#fbbf24;" id="ym-cc-alerts">障害・警告なし</div>
+                        <h4 style="margin-top:14px;">本日の活動</h4>
+                        <div class="ym-cc-bars" id="ym-cc-overview-bars"></div>
+                    </div>
+                </div>
+                <p class="ym-cc-hotkeys">ショートカット: / 検索 ・ Esc 詳細を閉じる ・ 1-9 カテゴリ切替</p>
+                <div class="ym-cc-card ym-v13-runtime-card" style="margin-top:12px;">
+                    <h4>YM Runtime Health</h4>
+                    <div class="ym-v13-runtime-grid">
+                        <div><span>Long Tasks</span><b id="ym-v13-longtasks">0</b></div>
+                        <div><span>DOM Mutations</span><b id="ym-v13-mutations">0</b></div>
+                        <div><span>Images Optimized</span><b id="ym-v13-images">0</b></div>
+                        <div><span>Render Skip</span><b id="ym-v13-renderskip">0</b></div>
+                        <div><span>Storage</span><b id="ym-v13-storage">—</b></div>
+                        <div><span>Network</span><b id="ym-v13-network">—</b></div>
+                    </div>
+                    <div id="ym-v13-runtime-note" class="ym-cc-hotkeys" style="margin-top:8px;">端末・ブラウザ側の実行負荷を監視します。</div>
+                </div>
+            </div>
+
+            <div id="dev-tab-users" class="dev-tab-content hidden">
+                <h3>登録端末・アカウント管理</h3>
+                <div class="ym-cc-toolbar">
+                    <input type="search" id="ym-cc-user-q" placeholder="ユーザー名 / YM-ID">
+                    <select id="ym-cc-user-status">
+                        <option value="all">すべて</option>
+                        <option value="online">オンライン</option>
+                        <option value="offline">オフライン</option>
+                        <option value="blocked">停止中</option>
+                    </select>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ユーザー名 / 端末ID</th>
+                            <th>使用時間</th>
+                            <th>保有コイン</th>
+                            <th>状態</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dev-user-list"></tbody>
+                </table>
+                <div id="ym-cc-user-extra" style="margin-top:12px;"></div>
+            </div>
+
+            <div id="dev-tab-messages" class="dev-tab-content hidden">
+                <h3>Messages</h3>
+                <div class="ym-cc-toolbar">
+                    <input type="search" id="ym-cc-msg-q" placeholder="本文・送信者で検索">
+                </div>
+                <div id="ym-cc-msg-list" class="ym-cc-log"></div>
+            </div>
+
+            <div id="dev-tab-ai" class="dev-tab-content hidden">
+                <h3>AI管理</h3>
+                <div class="ym-cc-kpis" id="ym-cc-ai-kpis"></div>
+                <div class="ym-cc-card" style="margin-top:10px;">
+                    <h4>AI設定</h4>
+                    <label>AI機能</label>
+                    <select id="ym-cc-ai-enabled">
+                        <option value="on">ON</option>
+                        <option value="off">OFF</option>
+                    </select>
+                    <label>1日あたり追加上限（0でプラン上限のみ）</label>
+                    <input type="number" id="ym-cc-ai-limit" min="0" value="0">
+                    <label>既定モデル</label>
+                    <select id="ym-cc-ai-default">
+                        <option value="ym-auto">Y.M AI（おすすめ）</option>
+                        <option value="openai">OpenAI</option>
+                        <option value="qwen-coder">Qwen Coder</option>
+                        <option value="deepseek">DeepSeek</option>
+                    </select>
+                    <label>AI応答速度</label>
+                    <select id="ym-cc-ai-fast">
+                        <option value="on">高速AIモード（思考時間を短縮）</option>
+                        <option value="off">通常モード</option>
+                    </select>
+                    <button class="menu-btn btn-success" id="btn-ym-cc-save-ai" style="width:auto;">AI設定を保存</button>
+                    <div id="ym-cc-ai-models" style="margin-top:12px;"></div>
+                    <div class="ym-ai-kpi-grid" id="ym-cc-ai-kpis-extra">
+                        <div class="ym-ai-kpi"><span>直近応答時間</span><b id="ym-cc-ai-latency">—</b></div>
+                        <div class="ym-ai-kpi"><span>平均応答時間</span><b id="ym-cc-ai-avg-latency">—</b></div>
+                        <div class="ym-ai-kpi"><span>成功回数</span><b id="ym-cc-ai-success">0</b></div>
+                        <div class="ym-ai-kpi"><span>失敗回数</span><b id="ym-cc-ai-fail">0</b></div>
+                    </div>
+                    <div class="ym-ai-health-list" id="ym-cc-ai-health"></div>
+                    <button class="menu-btn" id="btn-ym-cc-ai-health" style="width:auto;margin-top:10px;background:#334155;">AI接続・性能診断</button>
+                </div>
+            </div>
+
+            <div id="dev-tab-calls" class="dev-tab-content hidden">
+                <h3>Calls</h3>
+                <div class="ym-cc-kpis" id="ym-cc-call-kpis"></div>
+                <div class="ym-cc-log" id="ym-cc-call-log"></div>
+            </div>
+
+            <div id="dev-tab-distribute" class="dev-tab-content hidden">
+                <h3>配布システム (コイン・特別スタンプ)</h3>
+                <div id="ym-cc-coin-stats" class="ym-cc-kpis"></div>
+                <div style="background:#f8f9fa; padding:15px; border-radius:6px; border:1px solid #e0e0e0; margin-top:10px;">
+                    <label>対象ユーザー</label>
+                    <select id="distribute-target"></select>
+                    
+                    <label>配布アイテム種別</label>
+                    <select id="distribute-type">
+                        <option value="coin">コイン</option>
+                        <option value="stamp">特別 / 記念スタンプ</option>
+                    </select>
+
+
+                    <div id="dist-coin-area">
+                        <label>コイン数（マイナスで減算。例: -10）</label>
+                        <input type="number" id="dist-coin-amount" value="100">
+                        <label>作成者鍵（コイン操作のみ）</label>
+                        <input type="password" id="creator-unlock" autocomplete="off">
+                    </div>
+
+
+                    <div id="dist-stamp-area" class="hidden">
+                        <label>スタンプ名</label>
+                        <input type="text" id="dist-stamp-name">
+                        <label>スタンプ画像 (ファイル選択またはURL)</label>
+                        <input type="file" id="dist-stamp-file" accept="image/*">
+                        <input type="text" id="dist-stamp-url" placeholder="または画像URLを入力">
+                    </div>
+
+
+                    <button class="menu-btn btn-success" id="btn-exec-distribute">指定ユーザーへ配布実行</button>
+                </div>
+                <div class="ym-cc-card" style="margin-top:12px;">
+                    <h4>コイン流通</h4>
+                    <div id="ym-cc-tx-list" class="ym-cc-log"></div>
+                </div>
+            </div>
+
+            <div id="dev-tab-plans" class="dev-tab-content hidden">
+                <h3>プラン管理</h3>
+                <p class="text-sub" style="color:#94a3b8;">プランショップと連動します。価格・1日上限・機能メモを保存できます。</p>
+                <div id="ym-cc-plan-editor"></div>
+            </div>
+
+            <div id="dev-tab-upgrade" class="dev-tab-content hidden">
+                <div id="dev-payment-review" style="background:#f8f9fa;padding:15px;border-radius:8px;border:1px solid #e0e0e0;margin-top:10px;">
+                    <h4>💳 AIプラン支払い確認</h4>
+                    <p style="font-size:12px;color:#666;">支払い確認が完了するまで、有料プランは有効化されません。確認できない場合は無料プランへ戻します。</p>
+                    <label>確認対象プラン</label>
+                    <select id="dev-payment-plan"></select>
+                    <label>決済確認番号</label>
+                    <input type="text" id="dev-payment-reference" placeholder="取引IDまたは確認番号">
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                        <button class="menu-btn btn-success" id="btn-dev-confirm-payment" style="margin:0;">支払いを確認して有効化</button>
+                        <button class="menu-btn btn-warning" id="btn-dev-reject-payment" style="margin:0;">支払い不可・無料へ戻す</button>
+                    </div>
+                </div>
+                <h3>📢 全体アナウンス・一斉通知設定</h3>
+                <p style="font-size:12px; color:#666; margin-bottom:10px;">ユーザー画面上部に全端末へリアルタイムに安全なアナウンスを表示・一斉通知します。</p>
+                
+                <div style="background:#f8f9fa; padding:15px; border-radius:8px; border:1px solid #e0e0e0; margin-top:10px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <label for="dev-announcement-text" style="margin:0;">アナウンスメッセージ本文</label>
+                        <span id="announcement-char-count" style="font-size:12px; color:#666; font-weight:bold;">0 / 1000 文字</span>
+                    </div>
+                    <textarea id="dev-announcement-text" rows="4" maxlength="1000" placeholder="全体への重要なお知らせを入力..."></textarea>
+
+
+                    <label style="margin-top:8px;">表示スタイル（装飾タイプ）</label>
+                    <select id="dev-announcement-style" style="margin-bottom:12px;">
+                        <option value="normal">💛 通常お知らせ (黄色/標準)</option>
+                        <option value="danger">🚨 重要警告・メンテナンス (赤色)</option>
+                        <option value="success">🎉 成功・イベント告知 (緑色)</option>
+                        <option value="notice">📢 お知らせ作成</option>
+                        <option value="emergency">🚨 緊急通知</option>
+                        <option value="maintenance">🔧 メンテナンス</option>
+                        <option value="feature">✨ 新機能</option>
+                        <option value="campaign">🎁 キャンペーン</option>
+                    </select>
+
+
+                    <div style="display:flex; gap:10px; margin-top:10px;">
+                        <button class="menu-btn btn-success" id="btn-save-announcement" style="flex:1;">📢 全体通知を更新・一斉配信</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="dev-tab-requests" class="dev-tab-content hidden">
+                <h3>📥 ユーザーからの要望・ログ管理</h3>
+                <p class="text-sub" style="color:#94a3b8;">状態: 要望 → 確認済み → 検討中 → 開発中 → テスト中 → リリース済み</p>
+                <div id="ym-cc-request-board" class="ym-cc-req-col"></div>
+                <div id="dev-requests-container" style="display:flex; flex-direction:column; gap:10px; margin-top:10px;"></div>
+            </div>
+
+            <div id="dev-tab-stamps" class="dev-tab-content hidden">
+                <h3>🎨 出品スタンプ全件管理 (管理者権限)</h3>
+                <p style="font-size:12px; color:#666; margin-bottom:10px;">出品者に関わらず、すべてのスタンプを直接「削除」できます。</p>
+                <div id="dev-stamps-grid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(160px, 1fr)); gap:15px; margin-top:10px;"></div>
+            </div>
+
+            <div id="dev-tab-system" class="dev-tab-content hidden">
+                <h3>System</h3>
+                <div class="ym-cc-sys" id="ym-cc-system-full"></div>
+            </div>
+
+            <div id="dev-tab-security" class="dev-tab-content hidden">
+                <h3>Security</h3>
+                <div class="ym-cc-card">
+                    <div id="ym-cc-security-box"></div>
+                    <p style="font-size:12px;color:#94a3b8;margin-top:10px;">実サービスでは停止・コイン変更・プラン変更はサーバー側で認可してください。今の認証はクライアント側です。</p>
+                </div>
+            </div>
+
+            <div id="dev-tab-logs" class="dev-tab-content hidden">
+                <h3>Logs</h3>
+                <div class="ym-cc-toolbar">
+                    <label style="margin:0;text-transform:none;"><input type="checkbox" id="ym-cc-log-errors-only" style="width:auto;display:inline;margin-right:6px;">エラーだけ</label>
+                    <button class="menu-btn" id="btn-ym-cc-clear-logs" style="width:auto;background:#334155;margin:0;">表示をクリア</button>
+                </div>
+                <div class="ym-cc-log" id="ym-cc-log-full"></div>
+            </div>
+            </div>
+            <aside class="ym-cc-drawer" id="ym-cc-drawer"></aside>
+        </div>
+    </div>
+<script>
+const KEY="YM_CONVEX_URL";
+document.getElementById("url").value=localStorage.getItem(KEY)||"";
+function url(){ const u=String(document.getElementById("url").value||localStorage.getItem(KEY)||"").replace(/\/$/,""); localStorage.setItem(KEY,u); return u; }
+function creds(){ return { email:document.getElementById("email").value.trim().toLowerCase(), pin:document.getElementById("pin").value }; }
+async function run(kind,path,args){
+  const res=await fetch(url()+"/api/"+kind,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({path:path,args:args,format:"json"})});
+  const data=await res.json();
+  if(data.status==="error"||data.errorMessage) throw new Error(data.errorMessage||data.error||"失敗");
+  return data.value!==undefined?data.value:data;
+}
+function showPanel(on){
+  document.getElementById("admin-gate").classList.toggle("hidden",on);
+  document.getElementById("developer-view").classList.toggle("hidden",!on);
+  document.body.classList.toggle("ym-cc-active",on);
+}
+document.querySelectorAll(".dev-tab-btn").forEach(function(btn){
+  btn.addEventListener("click",function(){
+    document.querySelectorAll(".dev-tab-btn").forEach(function(b){b.classList.remove("active");});
+    document.querySelectorAll(".dev-tab-content").forEach(function(t){t.classList.add("hidden");});
+    btn.classList.add("active");
+    const id=btn.getAttribute("data-tab");
+    const el=document.getElementById(id);
+    if(el) el.classList.remove("hidden");
+    const title=document.getElementById("ym-cc-page-title");
+    if(title) title.textContent=btn.textContent.trim();
+  });
+});
+document.getElementById("btn-login").onclick=async function(){
+  const err=document.getElementById("err"); err.textContent="";
+  try{
+    const me=await run("query","admin:whoami",creds());
+    const chip=document.getElementById("ym-cc-session-chip");
+    if(chip) chip.textContent=me.email;
+    showPanel(true);
+  }catch(e){ err.textContent=e.message||"入れません"; }
+};
+const exitBtn=document.getElementById("btn-exit-dev");
+if(exitBtn) exitBtn.onclick=function(){ showPanel(false); };
+const saveAnn=document.getElementById("btn-save-announcement");
+if(saveAnn) saveAnn.onclick=async function(){
+  try{
+    const body=document.getElementById("dev-announcement-text").value;
+    const style=(document.getElementById("dev-announcement-style")||{}).value||"normal";
+    await run("mutation","admin:postAnnouncement",Object.assign(creds(),{body:body,style:style}));
+    alert("本体が数秒以内に読みます。Convex URL を本体でも同じ値にしてください。");
+  }catch(e){ alert(e.message||"保存できません"); }
+};
+const dist=document.getElementById("btn-exec-distribute");
+if(dist) dist.onclick=async function(){
+  try{
+    const typ=document.getElementById("distribute-type").value;
+    if(typ!=="coin"){ alert("スタンプ配布は次の段階です。今はコインのみサーバーへ送ります。"); return; }
+    const target=document.getElementById("distribute-target").value||document.getElementById("distribute-target").options[0]&&document.getElementById("distribute-target").options[0].value||"";
+    const rawTarget=target || prompt("対象ユーザーID") || "";
+    await run("mutation","admin:adjustCoins",Object.assign(creds(),{
+      creatorUnlock:(document.getElementById("creator-unlock")||{}).value||"",
+      target:rawTarget,
+      amount:Number(document.getElementById("dist-coin-amount").value),
+      note:"distribute"
+    }));
+    alert("コイン台帳に記録しました");
+  }catch(e){ alert(e.message||"記録できません"); }
+};
+
+async function fillFromSnapshot(){
+  try{
+    const res = await run("query","admin:getSnapshot",creds());
+    const snap = JSON.parse(res.payload||"{}");
+    const users = snap.users || [];
+    const userList = document.getElementById("dev-user-list");
+    if(userList){
+      userList.innerHTML = "";
+      users.forEach(function(u){
+        const tr=document.createElement("tr");
+        tr.innerHTML = "<td><strong>"+String(u.name||"").replace(/[<>]/g,"")+"</strong><br><span style='font-size:10px;color:#888;'>"+String(u.id||"")+"</span></td><td>"+String(u.usage||"—")+"</td><td>🪙 "+String(u.coins||0)+"</td><td>"+(u.blocked?"停止中":"正常")+"</td><td></td>";
+        userList.appendChild(tr);
+      });
+    }
+    const dist=document.getElementById("distribute-target");
+    if(dist){
+      dist.innerHTML = '<option value="ALL">【全員一斉】全登録ユーザー</option>';
+      users.forEach(function(u){
+        const o=document.createElement("option");
+        o.value=u.id; o.textContent=(u.name||u.id)+" ("+u.id+")";
+        dist.appendChild(o);
+      });
+    }
+    const logs=document.getElementById("ym-cc-log-full")||document.getElementById("dev-logs");
+    if(logs && snap.logs){ logs.textContent = (snap.logs||[]).join("\n"); }
+    const msgBox=document.getElementById("dev-tab-messages");
+    if(msgBox && snap.messageCount!=null){
+      let n=document.getElementById("ym-sync-msg-count");
+      if(!n){ n=document.createElement("p"); n.id="ym-sync-msg-count"; n.className="text-sub"; msgBox.insertBefore(n, msgBox.firstChild); }
+      n.textContent="同期メッセージ数: "+snap.messageCount;
+    }
+  }catch(e){}
+}
+setInterval(function(){ if(!document.getElementById("developer-view").classList.contains("hidden")) fillFromSnapshot(); }, 5000);
+const _login = document.getElementById("btn-login").onclick;
+document.getElementById("btn-login").onclick = async function(){
+  await _login();
+  fillFromSnapshot();
+};
+</script>
+</body>
+</html>
